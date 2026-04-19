@@ -1,0 +1,25 @@
+# Maintainer: Priyanshu
+pkgname=wipeforge
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Secure Disk Destruction Tool"
+arch=('any')
+url="https://github.com/Priyanshu/wipeforge"
+license=('GPL3')
+depends=('python' 'python-textual' 'python-pyudev' 'python-psutil' 'hdparm' 'nvme-cli')
+makedepends=('python-setuptools' 'python-build' 'python-installer' 'python-wheel')
+source=("${pkgname}-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$pkgname"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$pkgname"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  
+  install -Dm755 scripts/wipeforge "$pkgdir/usr/bin/wipeforge"
+  install -dm755 "$pkgdir/var/log/wipeforge"
+}
