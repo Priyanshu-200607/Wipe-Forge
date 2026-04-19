@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Wipe-Forge
 A secure, TUI-based Linux utility for the permanent and unrecoverable destruction of data on NVMe,   SSD, HDD, and USB drives.
 =======
@@ -221,4 +221,4 @@ When contributing, please respect the existing module boundaries — keep hardwa
 ---
 
 *Built for the people who understand that a deleted file is not a destroyed file.*
->>>>>>> 2cd085a (Base Version)
+
