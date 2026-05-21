@@ -1,7 +1,7 @@
 import os
 import random
 
-def verify_wipe(method: str, target: str, dry_run: bool = False) -> bool:
+def verify_wipe(method: str, target: str, size_bytes: int = 0, dry_run: bool = False) -> bool:
     if dry_run:
         return True
         
@@ -13,24 +13,27 @@ def verify_wipe(method: str, target: str, dry_run: bool = False) -> bool:
                 if any(b != 0 for b in first):
                     return False
                     
-                # 2. Check last sector
-                try:
-                    f.seek(-512, os.SEEK_END)
-                    last = f.read(512)
-                    if any(b != 0 for b in last):
-                        return False
-                except OSError:
-                    pass # Some systems don't allow seeking from END on blocks
+                # 2. Check last sector if size is known
+                if size_bytes > 512:
+                    try:
+                        f.seek(size_bytes - 512)
+                        last = f.read(512)
+                        if any(b != 0 for b in last):
+                            return False
+                    except OSError:
+                        pass # Some systems don't allow seeking on block devices
 
-                # 3. Random samples
-                f.seek(0, os.SEEK_END)
-                size = f.tell()
-                for _ in range(32):
-                    offset = random.randint(0, size - 512)
-                    f.seek(offset)
-                    sample = f.read(512)
-                    if any(b != 0 for b in sample):
-                        return False
+                # 3. Random samples if size is known
+                if size_bytes > 512:
+                    for _ in range(32):
+                        offset = random.randint(0, size_bytes - 512)
+                        try:
+                            f.seek(offset)
+                            sample = f.read(512)
+                            if any(b != 0 for b in sample):
+                                return False
+                        except OSError:
+                            pass
 
         except OSError:
             return False

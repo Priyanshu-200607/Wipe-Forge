@@ -6,28 +6,37 @@ from typing import Callable
 class WipeError(Exception):
     pass
 
-def execute_dd(target: str, size_bytes: int, progress_cb: Callable[[float, str], None], dry_run: bool = False):
+def execute_dd(target: str, size_bytes: int, progress_cb: Callable[[float, str], None], dry_run: bool = False, input_file: str = "/dev/zero"):
     if dry_run:
         for i in range(1, 11):
             progress_cb(i * 10.0, f"Dry run: simulating dd {i*10}%")
             time.sleep(0.2)
         return
 
-    cmd = ["dd", "if=/dev/zero", f"of={target}", "bs=4M", "conv=fsync", "status=progress"]
-    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True)
+    cmd = ["dd", f"if={input_file}", f"of={target}", "bs=4M", "conv=fsync", "status=progress"]
+    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, bufsize=0)
     
+    buffer = b""
     try:
         while True:
-            line = proc.stderr.readline()
-            if not line and proc.poll() is not None:
-                break
-            
-            if "bytes" in line and size_bytes > 0:
-                match = re.search(r'^(\d+)\s+bytes', line)
-                if match:
-                    written = int(match.group(1))
-                    pct = (written / size_bytes) * 100
-                    progress_cb(min(pct, 100.0), f"Written {written} / {size_bytes} bytes")
+            char = proc.stderr.read(1)
+            if not char:
+                if proc.poll() is not None:
+                    break
+                continue
+                
+            if char in (b"\r", b"\n"):
+                line = buffer.decode("utf-8", errors="ignore").strip()
+                buffer = b""
+                
+                if "bytes" in line and size_bytes > 0:
+                    match = re.search(r'^(\d+)\s+bytes', line)
+                    if match:
+                        written = int(match.group(1))
+                        pct = (written / size_bytes) * 100
+                        progress_cb(min(pct, 100.0), f"Written {written} / {size_bytes} bytes")
+            else:
+                buffer += char
     finally:
         if proc.poll() is None:
             proc.terminate()
@@ -73,9 +82,28 @@ def execute_hdparm(target: str, progress_cb: Callable[[float, str], None], dry_r
         
     progress_cb(100.0, "Secure erase complete.")
 
+def execute_shred(target: str, progress_cb: Callable[[float, str], None], dry_run: bool = False):
+    if dry_run:
+        for i in range(1, 11):
+            progress_cb(i * 10.0, f"Dry run: simulating shred {i*10}%")
+            time.sleep(0.2)
+        return
+
+    progress_cb(0.0, "Starting DoD 3-pass shredding (this will take time)...")
+    cmd = ["shred", "-n", "3", "-z", target]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise WipeError(f"shred failed: {proc.stderr}")
+        
+    progress_cb(100.0, "shred complete.")
+
 def execute_wipe(method: str, target: str, size_bytes: int, progress_cb: Callable[[float, str], None], dry_run: bool = False):
     if method == "dd-zero":
-        execute_dd(target, size_bytes, progress_cb, dry_run)
+        execute_dd(target, size_bytes, progress_cb, dry_run, input_file="/dev/zero")
+    elif method == "dd-random":
+        execute_dd(target, size_bytes, progress_cb, dry_run, input_file="/dev/urandom")
+    elif method == "shred-dod":
+        execute_shred(target, progress_cb, dry_run)
     elif method == "nvme-format":
         execute_nvme(target, progress_cb, dry_run)
     elif method == "hdparm-secure-erase":

@@ -37,3 +37,6 @@ MANIFEST
 
 # Project specific
 wipeforge.log
+*.log
+*.html
+.antigravitycli/

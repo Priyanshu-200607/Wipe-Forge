@@ -6,15 +6,55 @@ from wipeforge.core.models import DeviceInfo
 
 def resolve_base_device(dev_path: str) -> str:
     """Resolve partition paths (e.g. /dev/sda1) to their base device (/dev/sda)."""
-    if not dev_path.startswith('/dev/'):
-        return dev_path
-    dev_name = os.path.basename(dev_path)
+    real_path = os.path.realpath(dev_path)
+    if not real_path.startswith('/dev/'):
+        return real_path
+    dev_name = os.path.basename(real_path)
     sys_path = f"/sys/class/block/{dev_name}"
     if os.path.exists(sys_path):
         if os.path.exists(os.path.join(sys_path, "partition")):
             parent = os.path.dirname(os.path.realpath(sys_path))
             return os.path.join("/dev", os.path.basename(parent))
-    return dev_path
+    return real_path
+
+def resolve_physical_devices(dev_path: str) -> Set[str]:
+    """Recursively resolve virtual or partition paths (LVM, LUKS, RAID) to their parent physical disks."""
+    real_path = os.path.realpath(dev_path)
+    if not real_path.startswith('/dev/'):
+        return {real_path}
+        
+    dev_name = os.path.basename(real_path)
+    sys_path = f"/sys/class/block/{dev_name}"
+    
+    slaves_dir = os.path.join(sys_path, "slaves")
+    if os.path.isdir(slaves_dir):
+        try:
+            slaves = os.listdir(slaves_dir)
+            if slaves:
+                physical_devices = set()
+                for slave in slaves:
+                    slave_path = os.path.join("/dev", slave)
+                    physical_devices.update(resolve_physical_devices(slave_path))
+                return physical_devices
+        except Exception:
+            pass
+            
+    return {resolve_base_device(real_path)}
+
+def get_swap_base_disks() -> Set[str]:
+    """Identify disks hosting active swap space."""
+    swap_disks = set()
+    try:
+        if os.path.exists("/proc/swaps"):
+            with open("/proc/swaps", "r") as f:
+                lines = f.readlines()
+            for line in lines[1:]:  # skip header
+                parts = line.split()
+                if parts and parts[0].startswith("/dev/"):
+                    swap_disks.update(resolve_physical_devices(parts[0]))
+    except Exception:
+        pass
+    return swap_disks
 
 def get_system_base_disks() -> Set[str]:
     """Identify disks hosting critical system mount points."""
@@ -22,15 +62,16 @@ def get_system_base_disks() -> Set[str]:
     sys_disks = set()
     for part in psutil.disk_partitions(all=True):
         if part.mountpoint in system_mounts:
-            sys_disks.add(resolve_base_device(part.device))
+            sys_disks.update(resolve_physical_devices(part.device))
     return sys_disks
 
 def get_mounted_base_disks() -> Set[str]:
-    """Identify all disks that have active mounts."""
+    """Identify all disks that have active mounts or swaps."""
     mounted = set()
     for part in psutil.disk_partitions(all=True):
         if part.device.startswith('/dev/'):
-            mounted.add(resolve_base_device(part.device))
+            mounted.update(resolve_physical_devices(part.device))
+    mounted.update(get_swap_base_disks())
     return mounted
 
 def scan_devices() -> Tuple[List[DeviceInfo], List[DeviceInfo]]:
@@ -105,4 +146,35 @@ def scan_devices() -> Tuple[List[DeviceInfo], List[DeviceInfo]]:
         else:
             blocked_devices.append(dev_info)
             
+    if os.environ.get("WIPEFORGE_DEV") == "1":
+        mock_safe_usb = DeviceInfo(
+            stable_id="/dev/disk/by-id/usb-SanDisk_Ultra_Fit_1234567890-0:0",
+            kernel_name="sdb",
+            model="SanDisk Ultra Fit USB 3.0",
+            serial="1234567890",
+            size_bytes=64 * 1024**3,  # 64 GB
+            rotational=False,
+            transport="usb",
+            mounted=False,
+            is_system_disk=False,
+            dev_path="/dev/sdb"
+        )
+        mock_safe_hdd = DeviceInfo(
+            stable_id="/dev/disk/by-id/ata-WDC_WD10EZEX-00WN4A0_WD-WCC6Y1XS7Z4F",
+            kernel_name="sdc",
+            model="WDC WD10EZEX-00WN4A0 (Blue HDD)",
+            serial="WD-WCC6Y1XS7Z4F",
+            size_bytes=1000 * 1024**3,  # 1 TB
+            rotational=True,
+            transport="ata",
+            mounted=False,
+            is_system_disk=False,
+            dev_path="/dev/sdc"
+        )
+        # Avoid duplicate mock devices on refresh
+        if not any(d.dev_path == "/dev/sdb" for d in safe_devices):
+            safe_devices.append(mock_safe_usb)
+        if not any(d.dev_path == "/dev/sdc" for d in safe_devices):
+            safe_devices.append(mock_safe_hdd)
+
     return safe_devices, blocked_devices

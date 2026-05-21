@@ -20,7 +20,7 @@ def wipe_worker(device: DeviceInfo, strategy: WipeStrategy, dry_run: bool, queue
         execute_wipe(strategy.method, device.stable_id, device.size_bytes, progress_cb, dry_run)
         
         queue.put({"type": "status", "message": "Verifying wipe..."})
-        verified = verify_wipe(strategy.method, device.stable_id, dry_run)
+        verified = verify_wipe(strategy.method, device.stable_id, device.size_bytes, dry_run)
         
         if not verified:
             raise Exception("Verification failed. Data might not be fully destroyed.")

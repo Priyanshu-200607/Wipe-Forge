@@ -17,12 +17,10 @@ def check_binaries():
         sys.exit(1)
 
 def entry():
-    # Only skip root check in tests or specific dev scenarios if needed.
-    # We will enforce root by default for hardening.
+    # Only skip root check and binary checks in dev scenarios.
     if os.environ.get("WIPEFORGE_DEV") != "1":
         check_root()
-        
-    check_binaries()
+        check_binaries()
 
     # DO NOT import heavy modules before safety checks
     from wipeforge.tui.app import WipeForgeApp
