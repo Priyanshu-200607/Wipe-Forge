@@ -1,6 +1,6 @@
 
 
-# ⚡ Wipe-Forge
+# Wipe-Forge
 
 > **Permanent. Unrecoverable. Deliberate.**  
 > A safety-first disk destruction utility for Linux, built for people who mean it.
@@ -42,13 +42,13 @@ Wipe-Forge exists because:
 
 ## Features
 
-### 🔍 Intelligent Device Detection
+### Intelligent Device Detection
 Automatically scans all attached block devices and categorizes each one as **SAFE** (eligible to wipe) or **BLOCKED** (protected), based on whether it contains active system mounts.
 
-### 🛡️ Strict Safety Guardrails
+### Strict Safety Guardrails
 Drives containing `/`, `/boot`, or any currently mounted partition are **hard-blocked**. You cannot select them. There is no override flag. That's intentional.
 
-### 🧠 Context-Aware Wipe Strategies
+### Context-Aware Wipe Strategies
 Wipe-Forge analyzes the drive type and applies the right protocol automatically:
 
 | Drive Type | Method | Why |
@@ -57,10 +57,10 @@ Wipe-Forge analyzes the drive type and applies the right protocol automatically:
 | **SATA SSD** | `hdparm --security-erase` (ATA Secure Erase) | Instructs the drive's own firmware to wipe every flash cell |
 | **HDD / USB** | `dd if=/dev/zero` (Bit-by-Bit Overwrite) | Reliable full-surface zero-fill for magnetic and generic block devices |
 
-### 🔒 State Locking & Pre-Execution Verification
+### State Locking & Pre-Execution Verification
 Just before the wipe begins, a `DeviceLock` mechanism re-confirms the target drive's **serial number**, **model**, and **size**. If the device path has silently shifted (e.g., a USB was unplugged and re-enumerated as `/dev/sdb` instead of `/dev/sdc`), the operation is **aborted**.
 
-### ⏱️ Multi-Stage Confirmation
+### Multi-Stage Confirmation
 To execute a wipe, you must:
 1. Select the drive
 2. Type a specific confirmation string
@@ -68,10 +68,10 @@ To execute a wipe, you must:
 
 None of these steps can be skipped.
 
-### 📊 Live Progress Feedback
+### Live Progress Feedback
 The wipe runs in a background process via Python `multiprocessing`. The TUI receives live progress updates without blocking or freezing — you see exactly what's happening in real time.
 
-### 📝 Audit Logging
+### Audit Logging
 Every action — device scan, selection, confirmation, wipe start, and completion — is written to `wipeforge.log`. Because accountability matters.
 
 ---
@@ -122,25 +122,28 @@ Wipe-Forge/
 
 ## Installation
 
-### Prerequisites
+### Arch Linux (AUR)
 
-Ensure the required system binaries are installed:
+Wipe-Forge is available in the Arch User Repository as `wipeforge-git`. You can install it using an AUR helper such as `paru`:
 
 ```bash
-# Debian / Ubuntu
-sudo apt install nvme-cli hdparm coreutils
-
-# Arch
-sudo pacman -S nvme-cli hdparm coreutils
-
-# Fedora / RHEL
-sudo dnf install nvme-cli hdparm coreutils
+paru -S wipeforge-git
 ```
 
-### Setup
+### Manual Installation
+
+#### Prerequisites
+
+Ensure the required system utilities are installed:
+
+- **Debian / Ubuntu**: `sudo apt install nvme-cli hdparm coreutils`
+- **Arch Linux**: `sudo pacman -S nvme-cli hdparm coreutils`
+- **Fedora / RHEL**: `sudo dnf install nvme-cli hdparm coreutils`
+
+#### Setup
 
 ```bash
-# Clone the repo
+# Clone the repository
 git clone https://github.com/yourusername/wipe-forge.git
 cd wipe-forge
 
@@ -148,7 +151,7 @@ cd wipe-forge
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install Wipe-Forge
+# Install the package
 pip install .
 ```
 
@@ -192,7 +195,7 @@ All five layers must pass before data destruction begins.
 
 ---
 
-## ⚠️ Warning
+## Warning
 
 **This tool permanently destroys data. Correctly wiped drives cannot be recovered — not by you, not by a data recovery lab, not by anyone.**
 
